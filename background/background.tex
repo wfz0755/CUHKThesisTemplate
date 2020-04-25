@@ -1,0 +1,95 @@
+%
+% chapter background study
+
+\chapter{Background Study}
+
+% classification - static vs dynamic
+%
+Casavant and Kuhl \cite{casavant88} classified load distribution
+algorithms into static algorithms and dynamic algorithms.
+In {\it static algorithms\/}, task
+assignment decisions are made {\it a priori\/} during compilation time and
+are remain unchanged during run-time. In contrast, {\it dynamic algorithms\/}
+attempt to use current system workload information for run-time assignment
+of tasks to the appropriate nodes.
+
+
+\section{Suboptimal}
+% suboptimal heuristic-based
+%
+It is now commonly agreed that despite the higher run-time complexity,
+dynamic algorithms can potentially provide better performance than
+static algorithms.
+An important category of dynamic algorithms under
+Casavant and Kuhl's taxonomy
+is the {\it dynamic suboptimal heuristic-based algorithms\/}.
+The majority of existing dynamic LD algorithms fall
+into this category
+\cite{eager86a,feng94,lu95b,lionel85,shiv90,shiv92,shiv95,wang85}.
+Due to the intrinsic unavailability of accurate
+and timely global state information in a distributed system,
+targeting for suboptimal performance using heuristic-based
+algorithms is quite reasonable.
+
+
+\subsection{Components of Algorithms}
+% components of dynamic algorithms
+%
+The major components of a dynamic LD algorithm are:
+(1) the {\it location policy\/}, referring to the strategy used to
+search for a task transfer partner;
+(2) the {\it information policy}, referring to the way load
+information is disseminated among processing nodes; and
+(3) the {\it transfer policy\/}, referring to the strategy used to
+determine whether task transfer activities should be initiated by a node,
+either as a task sender or a task receiver.
+
+\section{Location Policy}
+
+% location policy - polling
+%
+Most existing location policies are {\it polling-based\/}.
+A polling session can be started by a heavily loaded node in
+an attempt to locate a lightly loaded task receiver, or {\it vice versa\/}.
+The polling session in the former case is said to be
+{\it sender-initiated\/} and the
+latter to be {\it receiver-initiated\/} \cite{eager86b,wang85}.
+These two basic approaches can be combined to form a
+{\it symmetri\-cally-initiated\/} algorithm,
+where polling sessions can be started by both senders and receivers.
+%
+A study on dynamic LD algorithms by Eager {\it et al\/} \cite{eager86b}
+showed that neither pure sender-initiated
+nor pure receiver-initiated location policy performs
+consistently over the whole range of system workload.
+%
+In~\cite{shiv90}, Shivaratri and Krueger
+proposed an adaptive symmetri\-cally-initiated location policy
+so that sender-initiated pollings only occur
+at low system workload, whereas receiver-initiated pollings are
+conducted whenever appropriate.
+This location policy shows performance advantage over a wide range
+of system workload.
+An important property of this algorithm is that load information
+gathered during polling activities are retained so as to provide
+a heuristic guide for subsequent polling activities.
+
+
+% load index - number of tasks in homogeneous systems
+%              our virtual load and its predictive behavior
+%
+A {\it workload index\/} measures how busy a node is.
+The most commonly used workload index is
+the number of application tasks residing in a node \cite{hatch90,kremien92}.
+Most existing transfer policies are {\it threshold-based\/},
+which means that a node qualifies as a task sender if its workload index
+exceeds certain threshold value
+\cite{eager86a,lu94,mirchandaney90,shiv90,stankovic84}.
+In contrast, a node qualifies as a task receiver if
+its workload index is below the threshold.
+When the workload index equals to the threshold,
+the node is regarded as ``normally'' loaded and no task transfer activity
+is needed.
+
+
+\chapterend

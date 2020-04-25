@@ -1,0 +1,44 @@
+%
+% chapter conclusion
+
+\chapter{Conclusion}
+
+
+A load distribution algorithm based on 
+anti-tasks and load state vectors is proposed.
+Anti-tasks are composite agents which travel around the distributed
+system to facilitate the pairing up of task senders and receivers 
+as well as the collection and dissemination of load information.
+Time-stamped load information is stored 
+in load state vectors which when used with anti-tasks,
+encourages mutual sharing of load information among processing nodes.
+The most important property of the algorithm is that
+anti-tasks are spontaneously directed towards processing nodes
+with high transient workload, thus allowing their surplus workload
+to be relocated quickly.
+
+We found from simulation experiments that our algorithm provides 
+significant reduction of mean task response time over a large range 
+of system sizes.
+The cost for achieving this performance gain in terms of
+CPU overhead and channel bandwidth consumption is generally
+comparable to the other algorithms we studied.
+%
+%To further our understanding on the performance characteristics
+%of the anti-task algorithm,
+%we plan to experiment the algorithm 
+%on the testbed developed by Lu and Hsieh.
+
+On the other hand, 
+we are currently working on an improvement of the anti-task algorithm
+by employing some {\it proxy nodes\/} in the distributed system 
+to store load state information. 
+Each proxy node serves as a mediator to collect and distribute
+load state information for a subset of nodes.
+By visiting a proxy node, an anti-task does not need to visit all
+the nodes in the system in order to acquire load information of
+the whole system.
+By then, the CPU overhead and communication cost can be limited.
+
+
+\chapterend

@@ -1,0 +1,1232 @@
+%
+% chapter anti-task based loading algorithms
+
+
+%***************************************************************
+\chapter{Anti-Task Based Loading Algorithms}
+
+%------------------------------------
+\note{Chapter Outline}
+{
+This chapter is the beginning of Part II, the study of a new
+category of load distribution algorithms.
+The ideas behind these new algorithms are two fold.
+First, the use of batch assignments which have been proved in Part I 
+to be advantageous.
+Second, the use of anti-tasks and load state vectors.
+This new category of LD algorithms is totally different from
+the usual polling-based algorithms, and is first proposed by the writer.
+
+In this chapter, we study the basic version of the new algorithms.
+Its benefits and its weaknesses are both evaluated.
+In the next two chapters, we discuss further improvements of the algorithms.
+
+\small
+The content of this chapter has been published in
+\begin{itemize}
+\item	``{\it Concurrency: Practice and Experience},''
+	10(14):1251--1269, 1998.
+\item	``{\it Proceedings, The ? ICDCS},''
+\end{itemize}
+}
+%------------------------------------
+
+Most existing LD algorithms are {\it polling-based\/}.
+It means that a node attempting to identify a task transfer partner
+will send a query message to a selected target node to ask for its consent
+\cite{casavant88,eager86a,eager86b,lu94,lu95b,shiv90,wang85}.
+The two negotiating nodes involved may share load information of each other
+by explicitly declaring
+their load states in the polling and reply messages.
+Alternatively, load information can be deduced from the
+semantics of messages exchanged.
+%
+As pollings are one-to-one in nature,
+a severe weakness of polling-based LD algorithms is that
+load information exchanged during a polling session
+is confined to the two negotiating nodes only.
+Consequently, to spread out load information among the constituent nodes,
+a lot of polling activities need to be conducted.
+
+In most polling-based LD algorithms, there is a
+{\it polling limit\/} to control the number of polling trials that a node
+can make during each attempt to locate a transfer partner.
+Polling limits are usually set to $f \cdot N$, where $N$ is the number
+of nodes in the DCS and $f$ is a fractional constant
+\cite{eager86a,lu95b}.
+%
+Another weakness of polling-based LD algorithms relates to
+the use of polling limits.
+When the DCS grows large (in terms of $N$),
+more and more polling trials are required before a node can successfully
+pair up a suitable task transfer partner.
+%
+Accompanied with the larger number of pollings is
+a higher amount of network bandwidth consumption and CPU overhead.
+If these algorithm execution costs are not controlled carefully,
+the performance penalty imposed may break even the
+performance gain obtained via load distribution.
+In the worse situation, the performance of the system
+running the LD algorithm may be worse than the performance of 
+a system without load distribution.
+We say that polling-based algorithms are {\it not scalable\/}.
+
+
+In this chapter,
+we propose a new LD algorithm which is based on
+{\it anti-tasks\/} and {\it load state vectors\/}.
+This new algorithm avoids the weaknesses of polling-based LD algorithms
+discussed above.
+%
+Anti-tasks are composite agents which travel around a DCS
+to facilitate the pairing up of task senders and receivers,
+as well as the collection and dissemination of load information.
+%
+Time-stamped load information of processing nodes is stored in
+load state vectors which, when used together with anti-tasks,
+encourage mutual sharing of load information among processing nodes.
+%
+Anti-tasks, which make use of load state vectors to decide
+their traveling paths, are spontaneously directed towards
+processing nodes having high {\it transient workload\/},
+thus allowing their surplus workload to be relocated quickly
+to lightly loaded nodes.
+
+Using simulations, we evaluate the performance of our new algorithm by comparing
+its performance with a number of well-known polling-based
+LD algorithms.
+We found that our algorithm provides significant reduction
+of mean task response time over a large range of system sizes 
+from 25 to 70 processing nodes.
+The cost for achieving this performance gain in terms of
+CPU overhead and channel bandwidth consumption is generally 
+comparable to the other algorithms we studied.
+All these nice properties of our algorithm can be attributed
+to the fact that anti-tasks spontaneously travel towards those nodes
+with high transient workload.  
+The direct consequence is that
+the available spare processing capacity (as represented by the anti-tasks)
+is immediately available to the busy nodes so that their
+surplus workload can be offloaded soonest possible.
+
+
+%***************************************************************
+\section{The New Algorithm}
+\label{sec:anti.basic.algorithm}
+
+A distributed system containing 
+$N$ autonomous processing nodes $P_1, P_2, \ldots, P_N$ is assumed.
+The system has no shared memory support and message passing
+is the only means of communication between the nodes.
+The communication network is fault free and strongly connected, and
+messages sent across the network are received in the order sent.
+
+We further assume that
+each node $P_i$ maintains its own local clock $C_i$.
+The system runs a distributed clock synchronization algorithm
+which ensures that the largest difference between the
+readings of any two clocks $C_i$ and $C_j$, $1 \leq i, j \leq N$,
+is not greater than a maximum clock skew $\xi$.
+Readers are referred to \cite{levi90} and \cite{tanenbaum95}
+for discussions on clock synchronization algorithms.
+
+
+
+
+%---------------------------------------
+\subsection {Load State Monitoring}
+\label{sec:anti.basic.monitor}
+
+We define three different {\it load states\/} 
+to represent how busy a node is.
+The load state of $P_i$ is stored in a variable $LS_i$.
+The criteria for setting the value of $LS_i$ are as follows:
+
+\begin{equation}
+	LS_i = \left\{ 
+	\begin{array}{ll}
+	{\bf HEAVY} \hspace{1cm} & \mbox{if } Q_i \geq T_{up} \\
+	{\bf NORMAL}		 & \mbox{if } T_{up} > Q_i \geq T_{low} \\
+	{\bf LIGHT}		 & \mbox{Otherwise}
+	\end{array}
+	\right.
+\label{eqn:anti.basic.load_state}
+\end{equation}
+
+\noindent
+where $Q_i$ is the total number of application tasks residing on $P_i$;
+$T_{up}$ is the {\it upper threshold\/}; and 
+$T_{low}$ is the {\it lower threshold\/}.
+$T_{up}$ and $T_{low}$ are algorithm design parameters
+which define the boundary for the {\bf NORMAL} state.
+%
+There are two kinds of events that can potentially change the value of $Q_i$,
+namely, task arrivals and task completions.
+Note that depending on the current value of $Q_i$,
+not all task arrival/completion events will induce a change on $LS_i$.
+This avoids a node from switching between 
+the three load states frequently and thus avoids
+unnecessary load distribution activities.
+%
+$P_i$ runs a {\it load state monitor\/} $m_i$
+to monitor $Q_i$ and update $LS_i$ accordingly if necessary.
+
+A node in the {\bf HEAVY} state is regarded as overly busy and
+is eligible to transfer its task(s) away
+to other nodes in the {\bf LIGHT} state, if there is any.
+In other words, a node in the {\bf HEAVY} state is a potential
+{\it task sender\/},
+while a node in the {\bf LIGHT} state is a potential {\it task receiver\/}.
+The principle challenge of a LD algorithm is
+to pair up task senders and receivers using the minimum execution cost.
+
+
+
+%---------------------------------------
+\subsection {Load State Vectors}
+
+Each node $P_i$, $1 \leq i \leq N$, maintains a local view
+of the load states of all other nodes in the system
+by using a load state vector, denoted by $LV_i$.
+
+\mydef{
+For each $P_i$, $1 \leq i \leq N$,
+the load state vector $LV_i$ is a $N$-dimensional vector where
+each vector component $LV_i[j]$, $1 \leq j \leq N$,
+is an ordered pair $(CV, LS)$.
+%
+$LV_i[j].LS$ records the load state of $P_j$ and
+$LV_i[j].CV$ records the value of clock $C_j$ at which
+the load state was announced by $P_j$.
+\\
+$\Box$
+}
+
+Vector component $LV_i[j]$ stores the latest load state
+of $P_j$ that $P_i$ has received.
+It represents the local view of $P_i$ on $P_j$'s ``current'' load state.
+Thus, load state vector $LV_i$ represents $P_i$'s
+local view of the load states of the entire DCS.
+We use the $i$th component of $P_i$'s load state vector to
+record $P_i$'s own load state.  That is,
+
+\begin{equation}
+        \left.
+        \begin{array}{lll}
+        LV_i[i].CV & \equiv & C_i(*)        \\
+        LV_i[i].LS & \equiv & LS_i
+        \end{array}
+        \hspace*{5mm}
+        \right\}
+        %
+        \mbox{for all \ } 1 \leq i \leq N
+\end{equation}
+
+\noindent
+where $C_i(*)$ denotes the reading of $C_i$
+at which $m_i$ last recorded a load state change.
+
+
+
+
+%---------------------------------------
+\subsection {Anti-Tasks}
+
+We now describe the role and the life cycle of an anti-task.
+An anti-task $A$ created by a lightly loaded node $P_c$
+is designated with a certain amount of processing capacity,
+denoted by $A.capacity$.
+It represents the amount of workload that
+$P_c$ is willing to accept from other busy nodes.
+\footnote{
+        The amount of workload is measured in
+        number of tasks. Other measurement units
+        (such as CPU time) is possible with a corresponding
+        modification of the load state definitions
+        (Section~\ref{sec:anti.basic.monitor}) and
+        appropriate load thresholds $T_{up}$ and $T_{low}$.
+        The use of different load state measurement schemes
+        does not affect the core part of our algorithm.
+}
+$P_c$ is called the {\it creator node\/} of $A$.
+%
+After its creation, 
+the anti-task travels around the nodes in the system.
+The order in which the nodes are visited depends on a data structure
+attached to the anti-task called a {\it trajectory\/},
+whose formal definition is given below:
+
+\mydef{
+The trajectory of an anti-task $A$, denoted by $A.trajectory$,
+is a $N$-dimen\-sional vector where each vector component
+$A.trajectory[i]$, $1 \leq i \leq N$, is an ordered 3-tuple $(CV, LS, VF)$.
+Tuple element $A.trajectory[i].LS$ denotes the load state of $P_i$ 
+and $A.trajectory[i].CV$ denotes the value of clock
+$C_i$ at which the load state was announced by $P_i$.
+Tuple element $A.trajectory[i].VF$ is a boolean variable 
+which records whether $P_i$ has already been visited by $A$
+and is thus called the \underline{visit flag}.
+\\
+$\Box$ 
+}
+
+
+A trajectory is similar to a load state vector, except 
+the use of visit flags.
+The role of visit flags will be discussed in the next sub-section.
+In brief, a trajectory assumes two functionalities:
+(1) to identify appropriate destinations for an anti-task to travel to; and
+(2) to store load state information collected as an anti-task travels.
+For fulfilling these functions, a trajectory is dynamically updated
+as the anti-task travels in the system.
+
+
+When the anti-task $A$ reaches a node $P_v$,
+load state information carried by its trajectory
+(recorded in $A.trajectory[\ ].LS$ and $A.trajectory[\ ].CV$)
+is compared with $P_v$'s load state vector, $LV_v$, for mutual update.
+By doing so, both $A$ and $P_v$
+can acquire more recent load state information.
+After the mutual update, if $A$ finds that
+its creator node $P_c$ is no longer lightly loaded
+(i.e. $A.trajectory[c].LS \neq \mbox{\bf LIGHT}$),
+$A$ completes its travel by returning to $P_c$.
+Otherwise, it tries to negotiate with $P_v$ for any possible
+task transfer activity.
+
+If $P_v$ is in the {\bf HEAVY} state,
+one or more tasks will be relocated from $P_v$ to $P_c$.
+The number of tasks to be relocated depends on both
+the anti-task's capacity,
+and the amount of surplus workload that $P_v$ has.
+After the task relocation,
+$A.capacity$ is decremented by the number of tasks relocated.
+This records the fact that
+$P_c$ now has higher workload and thus has fewer spare capacity.
+%
+The next action of the anti-task depends on
+the resulting value of $A.capacity$.
+If $A.capacity$ reduces to zero, the anti-task returns to $P_c$,
+where load state information captured by $A.trajectory$
+is used to update $LV_c$.
+Otherwise, the anti-task continues its travel
+to the next appropriate destination node (if any),
+the selection of which depends on the updated $A.trajectory$ and 
+will be discussed in the next sub-section.
+
+On the other hand, if $P_v$ is not {\bf HEAVY},
+no task relocation can happen between $P_v$ and $P_c$.
+The anti-task either travels to the next destination
+or returns to the creator node.
+
+From the above discussion, it is clear that
+an anti-task is a composite agent having three components:
+(1) $A.creator$, which records the $id$ of its creator node;
+(2) $A.capacity$; and
+(3) $A.trajectory$.
+
+
+
+
+%---------------------------------------
+\subsection {Anti-Task Handling Procedures}
+
+The load distribution algorithm is composed of three
+procedures called {\sc Creation}, {\sc Node\_Visit}, and {\sc Termination}.
+{\sc Creation} is invoked
+when a lightly loaded node creates an anti-task;
+{\sc Node\_Visit} is invoked when a node is being
+visited by an anti-task; and {\sc Termination} is invoked
+when an anti-task returns to its creator node.
+
+
+
+%-----------------------------------------
+\subsubsection {Procedure \sc Creation}
+
+Figure~\ref{fig:anti.basic.procedure_creation} 
+(Page~\pageref{fig:anti.basic.procedure_creation})
+shows the procedure {\sc Creation}.
+After anti-task $A$ is created, $A$ is attached with
+$A.creator$ and $A.capacity$,
+as stated in lines~1 and~2, respectively.
+%
+$A.capacity$ is initialized to $T_{up} - T_{low}$ for the following reason.
+According to the load state definitions given in 
+Section~\ref{sec:anti.basic.monitor},
+the workload of creator node $P_c$ (i.e. $Q_c$)
+must be smaller than $T_{low}$ for the
+load state of $P_c$ (i.e. $LS_c$) to be {\bf LIGHT}.
+Therefore, we can approximate the additional amount of workload that
+$P_c$ can receive without turning $LS_c$ into the {\bf HEAVY} state as 
+$T_{up} - T_{low}$.
+%
+This approximation relies on the assumption that there is no
+significant elevation of $P_c$'s workload due to local task arrivals
+before the anti-task finishes its travel and returns to $P_c$.
+Should this assumption be violated,
+a mechanism must be provided to enable $A$ to cease its travel
+and return to $P_c$, thus stopping any more remote tasks to $P_c$.
+This mechanism is discussed later when we describe
+procedure {\sc Node\_Visit}.
+
+The trajectory is initialized in lines 3--7.
+where corresponding components of $LV_c$ are copied to $A.trajectory$.
+In line 6, visit flags are all initialized to FALSE
+to record the fact that no remote node has been visited by $A$ so far.
+
+Lines 8 and 9 try to identify a node in the {\bf HEAVY} state.
+If there exists more than one suitable trajectory entry,
+the one with the largest $CV$ is selected.
+In other words, we select the node {\it most recently\/}
+showing the {\bf HEAVY} state.
+%
+If no trajectory entry shows the {\bf HEAVY} state,
+the algorithm tries to identify the node in
+the {\bf NORMAL} state {\it least recently\/} as shown in lines 13 and 14,
+hoping that the node has turned to the {\bf HEAVY} state.
+Similarly, if no trajectory entry shows the {\bf NORMAL} state,
+lines 18 and 19 identify the node in the {\bf LIGHT} state
+{\it least recently\/}.
+
+At last,
+the anti-task is forwarded to the selected destination node in line 20.
+
+
+%-------------------------------
+\begin{figure}[p]
+\begin{verbatim}
+PROCEDURE {\sc Creation} \\
+%
+// $P_c$ = the node creating the anti-task $A$ \\[2mm]
+%
+BEGIN \\
+1	\> $A.creator \longleftarrow P_c$  \\
+2	\> $A.capacity \longleftarrow T_{up} - T_{low}$  \\
+3	\> FOR $i = 1$ to $N$ DO \\
+4	\>	\> $A.trajectory[i].CV \longleftarrow LV_c[i].CV$  \\
+5	\>	\> $A.trajectory[i].LS \longleftarrow LV_c[i].LS$  \\
+6	\>	\> $A.trajectory[i].VF \longleftarrow \mbox{\bf FALSE}$  \\
+7	\> ENDDO  \\[2mm]
+%
+ 	\> // select first destination for anti-task $A$ to visit \\
+8	\> FOR ALL $j$, such that $A.trajectory[j].LS =$ HEAVY \\
+9	\>	\> Identify $k$, such that 
+			$A.trajectory[k].CV = \max \{ A.trajectory[j].CV \}$ \\ 
+10	\> IF success \\
+11	\>	\> GOTO line 20 \\
+12	\> ENDIF \\[2mm]
+%
+13	\> FOR ALL $j$, such that $A.trajectory[j].LS =$ NORMAL \\
+14	\>	\> Identify $k$, such that 
+			$A.trajectory[k].CV = \min \{ A.trajectory[j].CV \}$ \\ 
+15	\> IF success \\
+16	\>	\> GOTO line 20 \\
+17	\> ENDIF \\[2mm]
+%
+18	\> FOR ALL $j$, such that $A.trajectory[j].LS =$ LIGHT \\
+19	\>	\> Identify $k$, such that 
+			$A.trajectory[k].CV = \min \{ A.trajectory[j].CV \}$ \\[2mm]
+%
+20	\> Forward $A$ to $P_k$  \\
+END
+\end{verbatim}
+\caption {Procedure {\sc Creation} --- A lightly loaded node $p_c$ creates an anti-task $A$.}
+\label{fig:anti.basic.procedure_creation}
+\end{figure}
+%-------------------------------
+
+
+%-----------------------------------------
+\subsubsection {Procedure \sc Node\_Visit}
+
+Figure~\ref{fig:anti.basic.procedure_node_visit} 
+(Page~\pageref{fig:anti.basic.procedure_node_visit}
+shows the procedure {\sc Node\_Visit}
+executed by a node $P_v$ when it is visited by anti-task $A$.
+%
+% Mutual update of load state information
+%
+In lines 1--9, $P_v$ mutually updates
+$LV_v$ and $A.trajectory$ by pairwise comparisons
+of corresponding components.
+%
+The key is to compare the clock values
+$LV_v[i].CV$ and $A.trajectory[i].CV$ in line 2.
+The one with the larger clock value (i.e. more recent) is used
+to update the other one.
+By such mutual update, $P_v$ obtains the latest
+load state information collected by the anti-task
+from its previous destinations.
+The anti-task can also bring itself up-to-date, as
+$P_v$ may contain more recent load state information obtained
+from other anti-tasks visited $P_v$ earlier.
+%
+%If $A.trajectory$ is modified,
+%subsequent destinations of $A$ may be altered.
+%The most obvious alteration is shown in lines 9--11,
+%where the visit flag $A.trajectory[i].VF$ is set to FALSE
+%if $P_i$'s entry in the trajectory becomes {\bf HEAVY}.
+%This immediately directs the anti-task to $P_i$,
+%despite the fact that $A$ may have already visited $P_i$ before.
+%
+We call any alteration to the trajectory which involves a change
+of tuple element $A.trajectory[\ ].LS$ a {\it mutation\/}.
+Mutation helps to quickly direct the anti-task towards those nodes showing
+heavy transient workload (i.e. in the {\bf HEAVY} state),
+or away from those nodes recently recorded as {\bf LIGHT} or {\bf NORMAL}.
+
+%
+% Is creator node still lightly loaded ?
+%
+Lines 10--13 are used to determine whether $A$ should
+return to its creator node by examining
+$A.trajectory[A.creator].LS$,
+which may have been updated with $P_v$'s load state vector
+in lines 3--4.
+
+
+%
+% Offload any surplus workload
+%
+In lines 14--18, $P_v$ tries to offload some
+surplus workload to the creator node of $A$.
+It can do so only if it is in the {\bf HEAVY} state.
+The number of tasks that $P_v$ can offload is limited by the
+remaining capacity, $A.capacity$.
+After each task transfer, $A.capacity$ is decremented in line 16.
+$P_v$'s load state is also adjusted accordingly by its
+load state monitor $m_v$ in line~17.
+
+
+%
+% update anti-task's record on P_b's new load state
+%
+Lines 19--20 update $P_v$'s entry in $A.trajectory$
+since the load state of $P_v$ may be modified due to task relocations.
+In line 21, the visit flag $A.trajectory[v].VF$ is
+set to TRUE to reveal the fact that node $P_v$
+has already been visited by the anti-task.
+This effectively prevents the anti-task from coming back to $P_v$ again,
+unless it finds that $P_v$ has turned to the {\bf HEAVY} state
+again later (refer to lines 26--27).
+
+
+%
+% Should the anti-task continue to travel?
+%
+In line 22, $A.capacity$ is examined.
+Should it reduces to zero, all the spare capacity promised
+by the creator node has been consumed.
+The anti-task therefore ceases its travel and returns
+to the creator node as shown in lines 23--24.
+
+
+
+
+%-------------------------------
+%
+% Select next destination for anti-task $A$ to visit \\
+%
+Conversely, if $A.capacity$ remains greater than zero,
+the anti-task continues its travel.
+Lines 26--37 identify the next destination node.
+The steps here are similar to those
+in procedure {\sc Creation} (lines 8--19)
+except the additional checks on the visit flag and $P_k \neq A.creator$.
+If an appropriate destination node cannot be found, the anti-task
+has no choice but returns to its creator as shown in line 39.
+This happens when all the nodes have been visited
+by the anti-task and no {\bf HEAVY} node can be found.
+%
+At last, the anti-task is forwarded to its next destination in line 41.
+
+
+
+
+%-------------------------------
+\begin{figure}[p]
+\begin{verbatim}
+PROCEDURE {\sc Node\_Visit} \\
+%
+// $P_v$ = the node being visited by anti-task $A$ \\[1.5mm]
+%
+BEGIN \\
+	\> // Mutual update of load state information \\
+1	\> FOR $i=1$ to $N$ DO \\
+2	\> 	\> IF $LV_v[i].CV > A.trajectory[i].CV$ \\
+3	\>	\>	\> $A.trajectory[i].CV \longleftarrow LV_v[i].CV$  \\
+4	\>	\>	\> $A.trajectory[i].LS \longleftarrow LV_v[i].LS$  \\
+5	\>	\> ELSE \\
+6	\>	\>	\> $LV_v[i].CV \longleftarrow A.trajectory[i].CV$  \\
+7	\>	\>	\> $LV_v[i].LS \longleftarrow A.trajectory[i].LS$  \\
+8	\>	\> ENDIF  \\
+9	\> ENDDO  \\[1.5mm]
+%
+	\> // Is creator node still lightly loaded ? \\
+10	\> IF $A.trajectory[A.creator].LS \neq$ LIGHT \\
+11	\>	\> Forward $A$ to $A.creator$   \\
+12	\>	\> STOP  \\
+13	\> ENDIF  \\[1.5mm]
+%
+	\> // Offload any surplus workload  \\
+14	\> WHILE $LV_v[v].LS =$ HEAVY and $A.capacity > 0$ DO \\
+15	\>	\> Transfer a task from $P_v$ to $A.creator$  \\
+16	\>	\> $A.capacity \longleftarrow A.capacity - 1$  \\
+17	\> 	\> Update $LV_v[v].LS$ and $LV_v[v].CV$ by $m_v$  
+		   \hspace{5mm} 
+		   // not a responsibility of the load distribution algorithm \\
+18	\> ENDDO  \\[1.5mm]
+%
+	\> // Update anti-task's record on $P_v$'s new load state \\
+19	\> $A.trajectory[v].CV \longleftarrow LV_v[v].CV$  \\
+20	\> $A.trajectory[v].LS \longleftarrow LV_v[v].LS$  \\
+21	\> $A.trajectory[v].VF \longleftarrow$ TRUE  \\[1.5mm]
+END
+\end{verbatim}
+\caption {Procedure {\sc Node\_Visit} --- A node $P_v$ is visited by an anti-task $A$.}
+\label{fig:anti.basic.procedure_node_visit}
+\end{figure}
+
+
+%-----------------------------------------
+\subsubsection {Procedure \sc Termination}
+%
+Figure~\ref{fig:anti.basic.procedure_termination} 
+(Page~\pageref{fig:anti.basic.procedure_termination})
+shows the procedure {\sc Termination\/}
+executed by the creator node $P_c$ when its anti-task $A$ returns.
+The anti-task returns to $P_c$ either because
+(1) no more appropriate destination node can be selected;
+(2) the anti-task has been notified that $P_c$
+has turned to {\bf HEAVY} or {\bf NORMAL}; or
+(3) the anti-task's capacity has reduced to zero.
+%
+Regardless of the reason for $A$'s return,
+the only thing that $P_c$ needs to do is
+to update its load state vector
+using load state information stored in $A$'s trajectory.
+
+
+
+%-------------------------------
+\begin{figure}[p]
+\begin{verbatim}
+PROCEDURE {\sc Termination} \\
+%
+// $P_c$ = the node created the anti-task $A$, i.e. $P_{A.creator}$ \\[2mm]
+%
+BEGIN \\
+        \> // Update $P_c$'s load state vector \\
+1       \> FOR $i=1$ to $N$ DO \\
+2       \>      \> IF $A.trajectory[i].CV > LV_c[i].CV$ \\
+3       \>      \>      \> $LV_c[i].CV \longleftarrow A.trajectory[i].CV$  \\
+4       \>      \>      \> $LV_c[i].LS \longleftarrow A.trajectory[i].LS$  \\
+5       \>      \> ENDIF  \\
+6       \> ENDDO  \\[2mm]
+%
+7	\> Destroy $A$  \\
+END
+\end{verbatim}
+\caption {Procedure {\sc Termination} --- An anti-task returns to its creator node.}
+\label{fig:anti.basic.procedure_termination}
+\label{fig:anti.basic.result_I.trace_anti}
+\label{fig:anti.basic.result_I.trace_sym}
+\end{figure}
+%-------------------------------
+
+
+
+
+%***************************************************************
+\section{Simulation Experiments}
+\label{sec:anti.basic.simulation}
+
+%Three different approaches may be used for the evaluation of LD algorithms, 
+%namely, simulations, analytical models, and experiments.
+%%
+%As implementing a LD algorithm requires
+%the modifications of operating system environment for process accounting,
+%scheduling, suspension, migration, reactivation, etc.,
+%it is a very time consuming and costly exercise and thus 
+%performed only sparingly.
+%%
+%On the other hand, because of the intrinsic complex and dynamic nature of LD 
+%algorithms which makes developing an analytical model with 
+%reasonably comprehensiveness extremely difficult, 
+%this approach is also rarely used.
+%%
+%Consequently, simulations are commonly adopted as the primary tool
+%for the performance evaluation of LD algorithms~\cite{ahmad91,kremien92}. 
+
+%In recently years, some researchers use a combined simulation and 
+%experimentation approach for the evaluation of LD algorithms.
+%For example, Mehra and Wah~\cite{mehra95} developed a Workload Generator
+%which ``{\it is a facility for generating realistic and reproducible 
+%synthetic workloads for use in load-balancing experiments.}''
+%%Lu and Hsieh~\cite{lu96b} developed a testbed on the Mach microkernel for 
+%LD algorithm experimentations. 
+
+In this chapter, simulations are used to evaluate the performance of our
+anti-task algorithm.
+We have derived a comprehensive simulation model.
+In particular, the costs for running LD algorithms, 
+the intra-node scheduling of tasks, and the consumption of network bandwidth
+have all been carefully modeled. 
+Besides, we have collected and analyzed various simulation statistics
+which are listed in Table~\ref{tab:anti.basic.parameter} 
+(Page~\pageref{tab:anti.basic.parameter}).
+We believe that our simulation model is sophisticated enough for 
+comprehensive performance comparisons between our anti-task algorithm and
+a number of well known LD algorithms we have also studied.
+%As the simulation results reveal that the anti-task algorithm gives 
+%promising performance characteristics, we plan to experiment
+%the algorithm on the testbed developed by Lu and Hsieh.
+
+
+
+
+%=========================================
+\subsection {Simulation Model}
+\label {sec:anti.basic.node_model}
+
+Each processing node consists of three task queues:
+the {\bf Local Queue}, the {\bf Remote Queue}, and the {\bf Preemption Queue}.
+When a task arrives locally, it goes to the end of the Local Queue
+where it waits for the CPU in the First-Come-First-Serve (FCFS) basis.
+Tasks in the Local Queue are candidates for remote assignment when
+the node becomes busy (i.e. in the {\bf HEAVY} state).
+
+
+%----------
+Tasks transferred from other nodes are appended to the receiver's Remote Queue.
+The Remote Queue separates remotely transferred
+tasks from those locally arrived tasks in the Local Queue so that
+{\it task reassignment\/} is avoided.
+This prevents a task from continuous
+shifting among the nodes in the system, in which case unnecessary CPU
+and communication overhead would incur and the
+response time of the shifting task may become exceedingly high.
+%
+The Preemption Queue allows ``overhead tasks''
+created by LD algorithms to wait for the CPU.
+As overhead tasks are usually small and time critical,
+they always preempt the application task in execution
+(if there is one). 
+The preempted task can resume its execution only when all
+pending overhead tasks in the Preemption Queue are completed,
+including those generated during the course of its suspension.
+
+We assume a token-ring network having
+a bandwidth of 10 Mbits/sec.
+We select the token-ring network for the sake of
+simplifying the simulation program. 
+In fact, the use of different network models does
+not normally have any observable effect on the comparative
+simulation results, unless the network bandwidth
+is severely limited. 
+
+
+
+%===================================================
+\subsection {Algorithm Costs and Simulation Parameters}
+\label{sec:anti.basic.cost_model}
+%
+Many studies on dynamic LD algorithms made an overly simplified
+assumption that the execution and communication overhead due to
+load distribution activities are negligible.
+Kremien and Kramer pointed out, however, that this assumption 
+does not reflect runtime situations realistically \cite{kremien92}.
+%
+We believe that modeling both CPU overhead and network bandwidth
+consumptions due to load distribution activities at the appropriate level
+of complexity is essential to a correct assessment of LD algorithms.
+
+
+
+
+%--------------
+\subsubsection {Anti-Task Creation/Processing CPU Overhead}
+
+The amount of CPU overhead incurred when a processing node
+creates, receives, or forwards an anti-task is modeled as follows:
+%
+\begin{equation}
+	\mbox{Anti-task processing CPU overhead}
+	= \delta \cdot N
+\end{equation}
+%
+where $\delta$ is a constant and $N$ is the number of nodes in the system.
+The larger the number of nodes in the system and thus
+the longer the trajectory of an anti-task,
+the larger the processing overhead needed.
+
+
+
+
+%--------------
+\subsubsection {Anti-Task Traveling Delays}
+
+The communication delay involved in forwarding an anti-task from
+one processing node to another depends on the message length,
+which is modeled as follows.
+%
+\begin{equation}
+	\mbox{Anti-task message length}
+	= 21 + 5N  \mbox{\hspace{2mm} bytes.}
+\end{equation}
+%
+For each trajectory entry, we assume that 4 bytes are needed for the
+tuple element $CV$ (clock value),
+half byte for $LS$ (load state), and
+another half byte for $VF$ (visit flag).
+Thus, 5 bytes are needed for each of the $N$ trajectory entries, 
+giving a total of $5N$ bytes for the entire trajectory.
+%
+We assume that both $A.creator$ and $A.capacity$ require
+half byte, giving a total of 1 byte.
+%
+We also assume that 20 additional bytes are needed 
+by the headers and checksums for the entire anti-task. 
+Thus, additional 21 bytes are needed in each anti-task.
+
+
+%--------------
+\subsubsection {Polling Cost}
+
+This applies on polling-based algorithms only.
+Sending or receiving a polling message incurs a CPU overhead of 3 millisecond. 
+All polling messages are assumed to have a fixed size of 20 bytes.
+% actually 40 bytes
+
+
+%--------------
+\subsubsection {Task Transfer CPU Overhead}
+%
+The amount of CPU overhead imposed when a task $j$ is transferred
+remotely depends on the length(in Kbytes) of the task transfer message
+generated. This is referred to as the {\it code length\/} of task $j$.
+The CPU overhead is thus modeled as follows:
+%
+\begin{equation}
+	\mbox{Task transfer CPU overhead for task $j$}
+	= \Delta \cdot l_j
+\end{equation}
+%
+where $\Delta$ is the amount of CPU overhead imposed per Kbyte of
+task code transferred; and $l_j$ is the code length of task $j$.
+%
+In our simulations, a typical value of $\Delta$ is
+3ms per Kbyte. Thus, for a task having a code length of 15 Kbytes,
+both the sender and the receiver of the task are imposed with a
+CPU overhead of 45 ms.
+%
+To characterize the fact that some tasks may have a longer code length
+than others, an independent exponential distribution is used
+for task code lengths within each processing node.
+The mean of this exponential distribution in node $P_i$ is 
+denoted by $\bar{l}_i$. 
+Both $\Delta$ and $\bar{l}$ are simulation parameters.
+ 
+The values of the simulation parameters used 
+are summarized in 
+Table~\ref{tab:anti.basic.parameter} 
+(Page~\pageref{tab:anti.basic.parameter}).
+
+
+%--------------------------------------
+\begin{table}[htbp]
+\caption{Simulation parameters.}
+\label{tab:anti.basic.parameter}
+
+\begin{center}
+\begin{tabular}{ll} \hline
+{\sl Parameter} & {\sl Value} \\ \hline \hline
+%
+Token ring bandwidth				& 10 Mbits per sec \\
+Lower threshold, $T_{low}$ 			& 5 \\
+Upper threshold, $T_{up}$ 			& 15 \\
+Anti-task processing CPU overhead factor, $\delta$  	& 0.1 ms \\
+Task transfer overhead factor, $\Delta$		& 3 ms per Kbyte \\
+Mean task code length, $\bar{l}_i$		
+				& 10 Kbytes,  $\forall 1 \leq i \leq N$  \\ \hline
+%
+\end{tabular}
+\end{center}
+
+\end{table}
+%--------------------------------------
+
+
+
+
+%---------------------------------------
+\subsection {Simulation Results and Analysis}
+\label{sec:anti.basic.result_I}
+
+This section presents our first set of simulation experiments
+which serves two main purposes:
+(1) to study the traveling pattern of anti-tasks; and
+(2) to study if anti-tasks can identify {\bf HEAVY} nodes
+efficiently. In these experiments, a small system ($N=10$ nodes)
+is studied.
+
+Our anti-task algorithm is labeled as {\sc Anti}.
+In addition to algorithm {\sc Anti},
+we evaluate three polling-based algorithms ---
+{\sc S.Eager}, {\sc R.Eager}, and {\sc Sym.Eager}.
+%
+{\sc S.Eager} is purely {\it sender-initiated\/}, 
+meaning that only a heavily loaded node can start a polling session
+in an attempt to identify a task receiver.
+{\sc R.Eager} is purely {\it receiver-initiated\/},
+meaning that only a lightly loaded node can start a polling session.
+%
+In both algorithms, polling targets are identified on a random basis.
+Thus, no load state information is used to identify a polling target,
+nor need to be collected.
+These two algorithms are classical and they have been 
+extensively studied by Eager {\it et al\/} in \cite{eager86b}.
+%
+The third algorithm, {\sc Sym.Eager}, 
+is a combination of the above two and is thus {\it symmetri\-cally-initiated\/}.
+%
+The simplicity of these three algorithms' random polling target selections 
+allows properties of polling-based algorithms to be revealed clearly.
+In the next sub-section, we will compare the {\sc Anti} algorithm with
+a more sophisticated adaptive polling-based LD algorithm, which makes use of
+load state information in identifying polling targets.
+
+Figure~\ref{fig:anti.basic.result_I.trace_anti} 
+(Page~\pageref{fig:anti.basic.result_I.trace_anti})
+presents the performance of the {\sc Anti} algorithm. 
+It shows for each node a time trace
+on the instantaneous task queue length 
+(QL --- sum of local queue and remote queue), and
+the number of anti-tasks visiting a node per unit time, 
+referred to as the {\it anti-task density\/} (AD).
+%
+Correspondingly, Figure~\ref{fig:anti.basic.result_I.trace_sym} 
+(Page~\pageref{fig:anti.basic.result_I.trace_sym})
+presents the performance of the {\sc Sym.Eager} algorithm.
+It shows for each node a time trace on
+the instantaneous task queue length and the number of pollings 
+received by a node per unit time, 
+referred to as the {\it polling density\/} (PD).
+The workload pattern subject to the system is identical 
+in both cases.
+% 
+The time traces for {\sc S.Eager} and {\sc R.Eager} are not shown because
+their individual properties can be more or less reflected
+by the {\sc Sym.Eager} algorithm.
+Besides, {\sc Sym.Eager} provides the best performance among
+the three polling-based algorithms 
+(see Table~\ref{tab:anti.basic.result_I.performance}, 
+Page~\pageref{tab:anti.basic.result_I.performance}).
+
+
+
+%-------------------------------
+\subsubsection{Anti-Task Traveling Patterns}
+
+Figure~\ref{fig:anti.basic.result_I.trace_anti} shows that anti-tasks
+travel {\it spontaneously\/} towards those nodes with high transient 
+workload.  For example, during time 30--85 node 1 becomes heavily loaded
+because of rapid local task arrivals.
+Such workload elevation is reflected in the increase in 
+node 1's task queue length (QL).
+During this period, {\it all\/} the anti-tasks in the system 
+travel only to node~1 but not to any of the others,  
+which are all lightly or normally loaded.
+Similar situations occur at time 150 (at node~2), 
+time 400 (at nodes~1 and~4), time 800 (at node~2), and time 1000 (at node~8).
+Note that such anti-task traveling pattern occurs regardless
+the magnitude of the transient workload elevation of the busy node.
+A direct consequence of this traveling pattern is
+that all the available spare processing capacity 
+(represented by the anti-tasks) are {\it immediately\/}
+available to the busy node. This is in contrast to polling-based
+algorithms where receiver nodes are identified one-by-one  ---
+another receiver will be searched for only after the amount of spare 
+capacity of the current receiver has found to be inadequate. 
+Therefore, with the {\sc Anti} algorithm, surplus workload
+of the busy node can be offloaded soonest possible.
+
+Let us now examine the case when multiple busy nodes exist simultaneously.
+At time 400, both nodes 1 and 4 are subject to
+transient elevation of workload. 
+We found that anti-tasks are split between these two busy nodes.
+It happens that slightly more anti-tasks travel to node 4 initially,
+making the congestions at node 4 to be resolved more
+quickly than at node~1.
+Once the congestion at node 4 has been resolved at time 470, 
+the anti-tasks all rush to node 1. 
+This traveling pattern is illustrated in 
+Figure~\ref{fig:anti.basic.result_I.trace_anti}
+as complementary changes in anti-task density between node 1 
+and node 4 during time 400-550. Note that the anti-tasks do not
+travel to any other (non-{\bf HEAVY}) nodes during this period.
+
+On the other hand, we found that when there is no busy nodes, 
+the anti-tasks distribute evenly among the nodes in the system in an 
+attempt to search for any busy nodes and to disseminate load state
+information in doing so. 
+All the anti-task traveling patterns discussed above clearly
+reveal algorithm {\sc Anti}'s high adaptability towards changes in
+system workload.
+
+
+%-------------------------------
+\subsubsection{Polling Patterns}
+
+Figure~\ref{fig:anti.basic.result_I.trace_sym} shows the time traces on instantaneous queue length
+and polling density when {\sc SYM.Eager} is applied. 
+The system is subject to the same workload pattern as in {\sc Anti}. 
+We can see that regardless of the existence of busy nodes,
+polling messages are always evenly distributed among the nodes in the system.
+This is because {\sc SYM.Eager} does not intrinsically
+propagate workload information 
+so that each individual node has to search for
+its polling targets separately. 
+The probability for a node to be polled by a busy node
+is identical among all the nodes (including those busy nodes),
+thus the polling density is evenly distributed.
+Such polling pattern causes two immediate performance penalties:
+(1) sender-receiver pairings are not efficient and thus
+surplus workload in busy nodes cannot be resolved quickly; and
+(2) large amount of pollings are conducted and 
+the associated overhead are incurred to the system.
+
+
+%-------------------------------
+\subsubsection {Performance Comparisons}
+
+We can see by comparing Figures~\ref{fig:anti.basic.result_I.trace_anti} 
+and~\ref{fig:anti.basic.result_I.trace_sym} that algorithm {\sc Anti}
+reduces task congestions at busy nodes more 
+quickly than algorithm {\sc Sym.Eager} does.
+For example, in Figure~\ref{fig:anti.basic.result_I.trace_sym}, 
+we can see that the 
+transient workload elevation occurring in node 2 at time 800 
+cannot be resolved until time 1120, in contrast to time 950 
+when {\sc Anti} is used.
+That is, {\sc Sym.Eager} needs more than 2 times the time needed by {\sc Anti}.
+During the period when node 2 is heavily loaded,
+receiver-initiated pollings addressed to nodes 
+other than node 2 are all wasted because only node 2
+is a potential sender during this period.
+This implies that
+(1) CPU overhead and communication channel bandwidth
+are wasted for the fruitless pollings; and
+(2) spare processing capacity in those lightly loaded nodes cannot be
+utilized to process those surplus workload at node 2.
+	
+
+
+%-------------------------------
+Table~\ref{tab:anti.basic.result_I.performance} 
+shows some simulation statistics averaged
+over the entire simulation period.
+We can see that {\sc Anti} provides the lowest 
+mean task response time (29.9) among the four algorithms, 
+while the second lowest is provided by {\sc Sym.Eager} (49.3).
+In other words, {\sc Anti} provides a performance advantage of 39\%
+over {\sc Sym.Eager}.
+{\sc Anti}'s performance advantage is obviously due 
+to its ability to react to a node's transient workload elevation 
+quickly so that congested tasks at the busy node can be efficiently
+transferred to other lightly loaded nodes and get processed earlier.
+This is reflected in {\sc Anti}'s highest percentage of
+tasks remotely executed and lowest mean task queue length.
+
+Intuitively, algorithm {\sc Anti} should consume a larger CPU overhead
+than the other three polling-based algorithms because each anti-task 
+may need to travel a number of nodes before it can return to its creator.
+However, from Table~\ref{tab:anti.basic.result_I.performance}, 
+we can see that the amount of CPU overhead spent on negotiation activities 
+(anti-task travelings in the case of {\sc Anti}
+and pollings in the other three algorithms) are comparable.
+%
+This can be explained by the following two factors which
+suppress the amount of anti-task travels:
+%
+(1) the arrival of an anti-task to a node delays the node's necessity to 
+create a new anti-task on its own; and
+(2) the arrival of a single anti-task to a busy node may induce
+multiple task relocations (when its capacity is greater than one),
+thus reducing the number of anti-tasks needed totally.
+This is in contrast to polling-based algorithms where 
+each successful sender-receiver negotiation induces only 
+one task to be transferred usually.
+%
+Among the three polling-based algorithms, 
+{\sc Sym.Eager} spent the largest amount of CPU overhead on 
+negotiation activities as it adopts both sender-initiated and
+receiver-initiated pollings.
+
+From Table~\ref{tab:anti.basic.result_I.performance}, we also find that
+{\sc Anti} spends the largest amount of CPU overhead on task transfer activities.
+To provide a fair comparison, we divide 
+``{\it CPU overhead spent on task transfer\/}''  by
+``{\it percentage of tasks remotely executed\/}'' to give
+``{\it CPU overhead per \% task remotely executed\/}.''
+We can see that this amount is comparable in all 
+four algorithms.
+
+Furthermore, among the three polling-based algorithms, 
+{\sc Sym.Eager} consumes the largest amount of channel bandwidth
+as it employs both sender-initiated and receiver-initiated pollings.
+{\sc Anti} consumes slightly more channel bandwidth than {\sc Sym.Eager}.
+The extra bandwidth consumption can be attributed to its
+larger amount of remote executions.
+
+%------------------------------
+\begin{table}[htbp]
+\caption {Performance comparisons between the four LD algorithms.}
+\label {tab:anti.basic.result_I.performance}
+
+\begin{center}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{p{7.4cm}*{4}{c}} \hline
+%
+{\sl Performance Metrics} & {\sc S.Eager} & 
+{\sc R.Eager} & {\sc Sym.Eager} & {\sc Anti} \\ \hline\hline
+%
+Mean task response time                   & 72.3  & 77.5  & 49.3  & 29.9 \\
+Mean task queue length                    & 59.7  & 49.9  & 29.1  & 17.4 \\
+Percentage of tasks remotely executed     & 23.7  & 36.0  & 42.9  & 47.6  \\
+Net CPU utilization                       & 52.9  & 57.0  & 59.4  & 59.5 \\
+CPU overhead spent on negotiation (\%)    & 0.04  & 0.06  & 0.10  & 0.04 \\
+CPU overhead spent on task transfer (\%)  & 0.74  & 1.21  & 1.50  & 1.67 \\
+Total CPU overhead (\%)                   & 0.78  & 1.27  & 1.60  & 1.71 \\
+CPU overhead per \% task remotely executed (\%) 
+					  & 0.033 & 0.035 & 0.037 & 0.036 \\
+Communication bandwidth utilization (\%)  & 1.0   & 1.6   & 2.0   & 2.2 \\ 
+\hline
+\end{tabular}
+}
+\end{center}
+
+\end{table}
+%------------------------------
+
+
+%---------------------------------------
+%\subsection {Simulation Results and Analysis II}
+\label{sec:anti.basic.result_II}
+
+As the three Eager's algorithms evaluated above 
+do not use any load state information in the selection of
+polling targets, they are {\it non-adaptive\/} to changes in system workload.
+Algorithm {\sc Anti}'s better performance is easily expected
+as it collects and makes use of load state information.
+%
+It is essential for us to also compare {\sc Anti} with 
+other adaptive polling-based algorithms which make use of 
+load state information. 
+We select a symmetrically-initiated algorithm proposed
+by Shivaratri and Krueger in \cite{shiv90} for this purpose.
+This algorithm, labeled as {\sc SK}, has proven to provide 
+good system performance at the expense of a relatively small 
+amount of pollings \cite{lu95b,shiv90}.
+In this set of simulation experiments, 
+we also focus to study the {\it scalability\/} of the {\sc Anti} algorithm
+by employing different system sizes, from $N=10$ nodes to $N=70$ nodes.
+
+Table~\ref{tab:anti.basic.result_II.sk_vs_anti} 
+(Page~\pageref{tab:anti.basic.result_II.sk_vs_anti})
+shows the performance comparison between the
+{\sc Anti} and the {\sc SK} algorithms.
+We define the {\it improvement factor\/} as the percentage
+improvement of mean task response time, $RT$,  given by
+{\sc Anti} over that of {\sc SK}, that is,
+%
+\[
+	\mbox{Improvement Factor} = \frac {RT({SK}) - RT({Anti})}
+				          {RT({SK})}
+			            \mbox {x 100\%}
+\]
+%
+A positive improvement factor denotes a performance improvement
+while a negative value implies a performance degradation.
+
+
+%---------------------------------------------------
+\begin{table}[htbp]
+\caption {Performance comparisons between 
+{\sc Anti} and {\sc SK} across different system sizes.}
+\label{tab:anti.basic.result_II.sk_vs_anti}
+
+\begin{center}
+\begin{tabular}{p{4.0cm}l*{7}{c}} \hline
+%
+\multicolumn{2}{l}{\sl Number of nodes, $N$} 
+& {\sl 10}& {\sl 20} & {\sl 30} & {\sl 40} & {\sl 50} & {\sl 60} &{\sl 70} \\ 
+\hline
+%
+{Mean task response time} 
+& {\sc SK}	& 28.7	& 20.6	& 22.6	& 22.6	& 25.6	& 30.1	& 30.8 \\
+& {\sc Anti}	& 29.1	& 20.9	& 21.9	& 19.8	& 23.8	& 28.3	& 31.4 \\ 
+\cline{2-9}
+%
+& Imp. Fac. (\%)& -2.0	& -1.7	& +3.0	& +12.6	& +7.2	& +5.8	& -2.1 \\ 
+\hline
+%
+{CPU overhead on negotiations (1\%)}
+& {\sc SK}	& 0.04	& 0.07	& 0.08	& 0.12	& 0.10	& 0.09	& 0.06 \\
+& {\sc Anti}	& 0.41	& 1.71	& 2.95	& 5.20	& 5.21	& 4.68	& 3.02 \\ 
+\hline
+%
+{Channel utilization (\%)}
+& {\sc SK}	& 2.2	& 4.5	& 8.7	& 10.0	& 15.8	& 18.5	& 21.7 \\
+& {\sc Anti}	& 2.3	& 5.3	& 10.6	& 14.1	& 20.9	& 23.8	& 25.1 \\ 
+%
+\hline
+\end{tabular}
+\end{center}
+
+\end{table}
+%---------------------------------------------------
+
+
+From Table~\ref{tab:anti.basic.result_II.sk_vs_anti}, we found that {\sc Anti} 
+gives a positive improvement factor for system sizes 30 to 60 nodes.
+By interpolation, we can expect {\sc Anti} to perform
+better than {\sc SK} when the system contains 24 to 68 nodes.
+The trend is that the performance of {\sc Anti} relative to {\sc SK}
+continues to improve as the system size increases. 
+The best performance is achieved when the system contains around 40 nodes,
+where more than 12\% improvement can be obtained.
+Afterwards, the improvement diminishes. 
+When the system is larger than 68 nodes, a performance degradation occurs.
+The trend is explained as follows.
+
+When the system size is small, it is easy for a node to identify 
+an appropriate transfer partner by using pollings. 
+Thus, the use of polling-based algorithm is already good enough.
+The higher CPU overhead incurred by {\sc Anti} cannot be justified,
+thus {\sc Anti}'s slightly poorer performance is resulted.
+%
+As the system size increases, load state information cannot be propagated
+efficiently by using pollings.
+It becomes difficult for a node to locate an appropriate transfer partner
+when the {\sc SK} algorithm is used.
+Consequently, congested tasks in busy nodes are slow to be relocated. 
+In contrast, {\sc Anti} allows the large number of nodes to share 
+their load state information so that anti-tasks are quickly forwarded 
+to those busy nodes. Task congestions can therefore be resolved quickly.
+%
+However, when the system size grows further, 
+the trajectory of an anti-task becomes longer, meaning that
+(1) larger CPU overhead is needed for processing the trajectory; and
+(2) anti-tasks spend more time to travel in the system 
+and uses more channel bandwidth.
+This is reflected by {\sc Anti}'s increasing channel bandwidth utilization as
+system size increases.
+%
+The higher CPU overhead consumed by the anti-tasks relative to the polling 
+activities in {\sc SK} overwhelms the performance gain, leading to {\sc Anti}'s 
+poorer performance.
+
+
+\chapterend

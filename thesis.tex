@@ -1,0 +1,85 @@
+\documentclass[12pt]{report}
+
+\usepackage{setspace}
+\usepackage{graphics}
+\usepackage{thesis}
+\usepackage{latexsym}
+\usepackage[dvips]{epsfig}
+%\usepackage{color}
+\usepackage{graphicx}
+
+\topmargin	0.0cm
+\textheight    21cm
+
+%=======================================================
+\begin{document}
+
+%cover page information
+\thesistitle{My Wonderful Thesis}
+\authorname{Sai Man CHAN}
+\degree{Doctor of Philosophy}
+\programme{Computer Science and Engineering}
+\supervisor{Prof. Tai Man CHAN}
+\submitdate{2 Nov 2019}
+
+\coverpage
+
+%This is the cover page.
+
+\pagenumbering{roman}
+
+%=======================================================
+
+%abstract
+\abstractpage
+
+%=======================================================
+
+%acknowledgement
+\acknowledgementpage
+
+%=======================================================
+
+%dedication
+\dedicationpage
+
+%=======================================================
+
+%preamble sections
+\tableofcontents
+\listoffigures
+\listoftables
+
+%=======================================================
+
+%initialization
+\newpage
+\pagenumbering{arabic}
+
+\pagestyle{headings}
+
+\doublespacing
+
+%=======================================================
+
+%insert the chapters
+\input{./introduction/introduction.tex}
+\input{./background/background.tex}
+\input{./anti/anti.tex}
+\input{./conclusion/conclusion.tex}
+
+%=======================================================
+
+%appendix
+\appendix
+\input{./whatis/whatis.tex}
+
+%=======================================================
+
+%bibliography
+\newpage
+\addcontentsline{toc}{chapter}{Bibliography}
+\bibliographystyle{ieee}
+\bibliography{database}
+
+\end{document}

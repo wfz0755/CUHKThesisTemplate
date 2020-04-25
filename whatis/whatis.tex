@@ -1,0 +1,96 @@
+%
+% chapter What is an Operating System?
+
+\chapter{What is an Operating System?}
+
+An {\it operating system\/} is a program that acts as an 
+\textit{intermediary\/} between a user of a computer and the computer hardware. 
+The purpose of an operating system is to provide the environment in which
+a user can execute programs. The primary goal of an operating system
+is thus to make the computer system \underline{\textbf{\textit{convenient}}}
+to use. A secondary goal is to use the computer hardware in
+an \underline{\textbf{\textit{efficient}}} manner.
+
+%\vfill
+%
+%{
+%\noindent
+%\underline{\bf Textbook}  \\[3mm]
+%\noindent {\it ``Operating System Concepts'' } \\[2mm]
+%\noindent Silberschatz Galvin \\[2mm]
+%\noindent Fifth Edition, Addison Wesley
+%}
+
+
+%=======================================================
+\newpage
+
+\begin{figure}
+\centerline{\psfig{figure=./whatis/level.eps,width=13cm}}
+\caption{Abstract view of the components of a computer system.}
+\label{fig:level}
+\end{figure}
+
+\vskip 1cm
+\begin{itemize}
+\item   A computer system can be divided roughly into four components:
+        the hardware, the operating system, the application programs,
+        and the users.
+
+        \begin{itemize}
+        \item   The hardware --- CPU, memory, I/O devices, etc.
+                --- provides the basic computing resources.
+        \item   The applications --- compilers, database systems, games,
+                business programs --- defines the ways in which
+                the hardware resources are used to solve the computing
+                problems for the users.
+        \end{itemize}
+
+\item	Examples
+	\begin{itemize}
+	\item	Mainframe computers --- IBM OS/360, ...
+	\item	Minicomputers --- Unix (HP-UX, Ultrix, AIX),
+		OS/400, HP MPV, VAX OS, AOS, ... 
+	\item	Personal computers --- CP/M, MS-DOS, MS-Windows, Mac OS,
+			Linux, BeOS, ...
+	\item	Palm tops --- Windows-CE, Palm OS, ...
+	\end{itemize}
+				
+
+\end{itemize}
+
+
+
+%=======================================================
+\newpage
+
+\note{Roles of an Operating System}{
+The fundamental goal of computer systems is to execute user programs
+and to make solving user problems easier.
+Since bare hardware alone is not particularly easy to use,
+application programs are developed. These various programs require
+{\it certain common operations\/}, such as those controlling the I/O devices.
+The common functions of controlling and allocating resources
+are then brought together into one piece of software:
+the operating system \cite{hsieh96} \cite{hsieh97}.
+
+\begin{itemize}
+\item   An operating system is similar to a {\it government\/}
+        --- The operating system controls and coordinates the use of the
+        hardware among the various application programs for the
+        various users.
+
+\item   An operating system can be viewed as a {\it resource allocator\/}
+        --- The operating system acts as the manager of the resources
+        and allocates them to specific programs and users as necessary.
+
+\item   An operating system is a {\it control program\/}
+        --- The operating system controls the execution of user programs
+        to prevent errors and improper use of the computer.
+
+\item   In general,
+        there is no adequate definition of an operating system.
+\end{itemize}
+}
+
+

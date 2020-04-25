@@ -1,0 +1,48 @@
+%
+% chapter introduction
+
+\chapter{Introduction}
+
+
+Most existing LD algorithms are {\it polling-based\/}.
+It means that a node attempting to identify a task transfer partner
+will send a query message to a selected target node to ask for its consent
+\cite{casavant88,eager86a,eager86b,lu94,lu95b,shiv90,wang85}.
+The two negotiating nodes involved may share load information of each other
+by explicitly declaring
+their load states in the polling and reply messages.
+Alternatively, load information can be deduced from the
+semantics of messages exchanged.
+%
+As pollings are one-to-one in nature,
+a severe weakness of polling-based LD algorithms is that
+load information exchanged during a polling session
+is confined to the two negotiating nodes only.
+Consequently, to spread out load information among the constituent nodes,
+a lot of polling activities need to be conducted.
+
+In most polling-based LD algorithms, there is a
+{\it polling limit\/} to control the number of polling trials that a node
+can make during each attempt to locate a transfer partner.
+Polling limits are usually set to $f \cdot N$, where $N$ is the number
+of nodes in the DCS and $f$ is a fractional constant
+\cite{eager86a,lu95b}.
+%
+Another weakness of polling-based LD algorithms relates to
+the use of polling limits.
+When the DCS grows large (in terms of $N$),
+more and more polling trials are required before a node can successfully
+pair up a suitable task transfer partner.
+%
+Accompanied with the larger number of pollings is
+a higher amount of network bandwidth consumption and CPU overhead.
+If these algorithm execution costs are not controlled carefully,
+the performance penalty imposed may break even the
+performance gain obtained via load distribution.
+In the worse situation, the performance of the system
+running the LD algorithm may be worse than the performance of 
+a system without load distribution.
+We say that polling-based algorithms are {\it not scalable\/}.
+
+
+\chapterend
